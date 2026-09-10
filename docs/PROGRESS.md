@@ -186,3 +186,32 @@
 - 事件识别为即时的（开关机事件在操作后立刻出现），此前的"音量日志延迟"问题已随多线程改造消失。
 - 至此用户需求 1/2/3（Rust 实现、开机切默认、关机恢复）**全部真机验证通过**；
   剩余计划：服务化（后台运行 / 开机自启）。
+
+## 2026-09-10 23:15 — 第 16 步：开机自启（登录时自动运行，无窗口）
+- **技术选型**：默认输出音频设备是"按登录会话"生效的，Windows 服务在 Session 0 无法修改
+  桌面会话的默认设备 → 采用"当前用户登录时启动的计划任务"（与 SoundSwitch 等同类工具一致）；
+  真正的服务形式（服务 + 每会话代理）留待后续评估。
+- **代码改动**：
+  - 新增 `src/single_instance.rs`：命名互斥体（`Local\sound-switch-single-instance`）单实例保护，
+    仅用于 `run` 模式；进程崩溃也会由系统自动释放，无残留文件。
+    实测：已有实例运行时，第二个实例立即输出
+    「已有 sound-switch 实例正在运行（单实例保护），本次退出」并以 0 退出。
+  - 新增第二个可执行文件 `src/launch.rs` → `sound-switch-launch.exe`（`#![windows_subsystem = "windows"]`）：
+    自身不分配控制台，用 `CREATE_NO_WINDOW` 拉起 `sound-switch.exe run`；
+    退出码 0=成功 / 2=找不到主程序 / 3=取路径失败 / 4=启动失败（便于看任务的"上次运行结果"）。
+  - `log.rs`：控制台输出改为忽略写失败（原 `print!` 在标准输出异常时会 panic）。
+- **实测发现（重要）**：计划任务直接启动控制台程序**会带出可见窗口**
+  （实测 `MainWindowHandle=197922`），与"任务会隐藏窗口"的常见说法不符 → 因此必须用启动器方案；
+  用启动器后实测 `MainWindowHandle=0`（无可见窗口），内存 6.56MB。
+- **安装结果**（`scripts\install-autostart.ps1 -StartNow`）：
+  - 任务名 `sound-switch`；执行 `target\release\sound-switch-launch.exe`；
+    工作目录 = 项目根目录；触发 = 当前用户登录时（Interactive, RunLevel=Limited）；
+    `ExecutionTimeLimit=PT0S`（无上限，默认 3 天限制已解除）；`MultipleInstances=IgnoreNew`。
+  - 实测通过任务启动后：进程无窗口、日志写入项目 `logs\`（证明工作目录正确）、
+    `Get-ScheduledTaskInfo.LastTaskResult=0`。
+- 新增文件：`src/launch.rs`、`src/single_instance.rs`、`scripts\install-autostart.ps1`、
+  `scripts\uninstall-autostart.ps1`；README 增加"开机自启"整节。
+- **已知限制（记入 README）**：登录时耳机若已处于开机状态且当前默认不是耳机，
+  程序不会主动切换（只对开关机事件做反应）；如需覆盖需增加"启动时状态同步"，
+  前提是能可靠判断耳机当前开关机状态（待研究，例如向 HID 写入状态查询包）。
+- 期间为重建 exe 两次停掉了用户手动启动的实例（exe 被运行中的进程锁定）。

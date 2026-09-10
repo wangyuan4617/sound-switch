@@ -21,6 +21,7 @@ mod audio;
 mod config;
 mod hid;
 mod log;
+mod single_instance;
 mod state;
 
 use config::Config;
@@ -183,6 +184,11 @@ fn main() -> Result<()> {
             actions.manual_restore();
         }
         "run" | _ => {
+            // 单实例保护：开机自启的实例与手动启动的实例不会同时监听
+            let Some(_guard) = single_instance::acquire() else {
+                log::warn("已有 sound-switch 实例正在运行（单实例保护），本次退出");
+                return Ok(());
+            };
             let actions = app::Actions::new(cfg);
             let stop = Arc::new(AtomicBool::new(false));
             let stop2 = stop.clone();

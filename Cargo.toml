@@ -3,6 +3,15 @@ name = "sound-switch"
 version = "0.1.0"
 edition = "2024"
 
+[[bin]]
+name = "sound-switch"
+path = "src/main.rs"
+
+# 无窗口启动器：供“登录时自启”计划任务使用（见 src/launch.rs）
+[[bin]]
+name = "sound-switch-launch"
+path = "src/launch.rs"
+
 [dependencies]
 anyhow = "1.0.104"
 com-policy-config = "0.6"
@@ -10,5 +19,5 @@ ctrlc = "3.5.2"
 hidapi = "2.6.7"
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.151"
-windows = { version = "0.61", features = ["Win32_Foundation", "Win32_Media_Audio", "Win32_System_Com", "Win32_System_Com_StructuredStorage", "Win32_System_SystemInformation", "Devices_Custom", "Win32_System_Variant", "Win32_UI_Shell_PropertiesSystem", "Win32_Devices_FunctionDiscovery", "Win32_System_Console"] }
+windows = { version = "0.61", features = ["Win32_Foundation", "Win32_Media_Audio", "Win32_System_Com", "Win32_System_Com_StructuredStorage", "Win32_System_SystemInformation", "Devices_Custom", "Win32_System_Variant", "Win32_UI_Shell_PropertiesSystem", "Win32_Devices_FunctionDiscovery", "Win32_System_Console", "Win32_System_Threading", "Win32_Security"] }
 winreg = "0.56.0"

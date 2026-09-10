@@ -194,3 +194,81 @@ sound_switch/
 
 本程序无需介入（既不需要调用第三方工具，也不需要写注册表）。
 完整的实验方法、注册表证据与结论见 `docs/experiments/FINDINGS.md`。
+
+---
+
+# 开机自启（登录时自动运行，无窗口）
+
+## 为什么用计划任务而不是 Windows 服务
+
+「默认输出音频设备」是**按登录会话**生效的设置，而 Windows 服务运行在 Session 0，
+**无法修改你桌面会话的默认设备**。因此正确做法是：以**当前用户身份、在登录时**启动
+（SoundSwitch 等同类工具也是这个方案）。真正的服务形式需要"服务 + 每会话代理进程"，
+复杂度高，留待后续评估。
+
+## 安装
+
+```powershell
+# 先构建（会生成两个 exe）
+cargo build --release
+
+# 安装“登录时自动启动”，并立即启动一次（无需重新登录）
+powershell -ExecutionPolicy Bypass -File scripts\install-autostart.ps1 -StartNow
+```
+
+脚本会注册一个名为 `sound-switch` 的计划任务：
+
+| 项目 | 值 |
+|---|---|
+| 触发 | 当前用户**登录时**（Run only when user is logged on） |
+| 执行 | `target\release\sound-switch-launch.exe`（无窗口启动器） |
+| 工作目录 | 项目根目录（`config.json` / `state.json` / `logs\` 都相对它） |
+| 时间上限 | 无（已解除默认的"运行超过 3 天就停止"） |
+| 多实例 | IgnoreNew（另有程序自身的单实例保护兜底） |
+| 权限 | 普通用户权限（Level=Limited，改默认输出设备不需要管理员） |
+
+> **关于"无窗口"**：计划任务直接启动控制台程序时**会显示一个控制台窗口**（实测确认）。
+> 因此这里用 `sound-switch-launch.exe`：它本身是 GUI 子系统程序（不分配控制台），
+> 再用 `CREATE_NO_WINDOW` 拉起真正的 `sound-switch.exe`，所以既无窗口、也不会闪一下。
+
+## 查看与操作
+
+```powershell
+# 查看任务状态
+Get-ScheduledTask -TaskName sound-switch | Format-List
+Get-ScheduledTaskInfo -TaskName sound-switch | Select LastRunTime, LastTaskResult   # 0 = 成功
+
+# 查看后台实例（MainWindowHandle 应为 0 = 无窗口）
+Get-Process sound-switch | Select Id, MainWindowHandle, WorkingSet64
+
+# 查看运行日志
+Get-Content logs\sound_switch.log -Tail 20 -Encoding UTF8
+
+# 手动启动 / 停止
+Start-ScheduledTask -TaskName sound-switch
+Get-Process sound-switch | Stop-Process
+
+# 卸载（删除任务并结束实例）
+powershell -ExecutionPolicy Bypass -File scripts\uninstall-autostart.ps1
+```
+
+> 任务里的启动器进程会立刻退出（任务显示 Ready 是正常的），真正常驻的是 `sound-switch.exe`。
+> 因此"停止"要停进程，而不是 `Stop-ScheduledTask`。
+
+## 验证自启是否生效
+
+重启或注销后重新登录，然后确认：
+
+```powershell
+Get-Process sound-switch | Select Id, MainWindowHandle     # 应有进程且 MainWindowHandle=0
+Get-Content logs\sound_switch.log -Tail 3 -Encoding UTF8   # 末尾应有当次登录时间的「监听器启动」
+```
+
+## 已知限制
+
+- **登录时耳机已经是开机状态**：程序只对"开机/关机事件"做反应，因此不会主动切换设备
+  （如果此时默认设备不是耳机，需要你手动切一次，或关机后再开机一次触发事件）。
+  如需覆盖该场景，可后续增加"启动时状态同步"（要先能可靠判断耳机当前是否开机）。
+- 修改 `config.json` 后需要重启后台实例（`Get-Process sound-switch | Stop-Process` 再
+  `Start-ScheduledTask -TaskName sound-switch`）。
+- 重新编译前必须先停掉后台实例（Windows 会锁定正在运行的 exe）。

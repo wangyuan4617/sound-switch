@@ -96,9 +96,12 @@ fn write(lvl: &str, msg: &str) {
     let prefix = if l.dry_run && lnum >= 2 { "[dry-run] " } else { "" };
     let line = format!("{} [{}] {}{}\n", now_str(), lvl.to_uppercase(), prefix, msg);
 
-    // 控制台
-    print!("{}", line);
-    let _ = std::io::stdout().flush();
+    // 控制台（写失败也不影响运行：例如无窗口启动、标准输出被关闭时）
+    {
+        let mut out = std::io::stdout();
+        let _ = out.write_all(line.as_bytes());
+        let _ = out.flush();
+    }
 
     // 文件：写之前先判断是否会超限，超限则先轮转
     if let Ok(mut sink) = l.sink.lock() {
