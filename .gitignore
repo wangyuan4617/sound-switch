@@ -9,5 +9,8 @@
 /state.json
 *.log
 
+# DTS 实验快照：含本机音频端点 GUID、USB 实例路径等设备信息，不入库
+/docs/experiments/dts-*.txt
+
 # IDE
 /.idea/

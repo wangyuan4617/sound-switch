@@ -110,7 +110,9 @@ HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\MMDevices\Audio\Render\{耳机端
    `SoundVolumeView.exe /SetSpatial "<设备>" "DTS Headphone:X"`（理由见第三节），
    并注意该写入涉及 HKLM 端点属性，可能需要管理员权限。
 
-## 六、附：相关快照文件
+## 六、附：快照文件说明
+
+实验当时拍过 4 份注册表快照（各约 827KB）：
 
 | 文件 | 说明 |
 |---|---|
@@ -118,3 +120,20 @@ HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\MMDevices\Audio\Render\{耳机端
 | `dts-after.txt` | 切换为 DTS Headphone:X 后 |
 | `dts-current.txt` | 复核用（与 after 完全一致，仅时间戳不同） |
 | `dts-persist.txt` | 两次开关耳机电源之后（关键属性仍未变，见第四节） |
+
+**这些快照不纳入仓库**：它们是本机的临时证据，含本机音频端点 GUID、USB 实例路径等设备信息，
+体积也较大（各约 827KB）。仓库里只保留**结论与关键字节**（见第二、三节），
+因此不影响复核。需要自己复核时：
+
+1. 用目录下的 `snapshot-audio-registry.ps1` 拍快照：
+   ```powershell
+   powershell -ExecutionPolicy Bypass -File docs\experiments\snapshot-audio-registry.ps1 -Out docs\experiments\dts-now.txt
+   ```
+2. 用 `diff-snapshots.ps1` 与另一份快照对比：
+   ```powershell
+   powershell -ExecutionPolicy Bypass -File docs\experiments\diff-snapshots.ps1 -Before a.txt -After b.txt
+   ```
+3. 建议把生成的 `dts-*.txt` 加入 `.gitignore` 或放在仓库外，避免把本机设备信息提交上去。
+
+> 注意：快照里的音频端点 GUID、USB 实例路径等都是**每台机器/每次系统安装各不相同**的标识，
+> 与实验结论无关；本节已把与结论相关的属性名和字节值直接写在正文里。
