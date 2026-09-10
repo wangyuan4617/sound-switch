@@ -96,3 +96,28 @@
   定位出对应值后实现为**可选功能**（配置开关，默认关闭），并明确要求以管理员身份运行；
   或推迟到服务化阶段（服务天然具备管理员权限）一并实现。
 - 另：DTS Sound Unbound 为 Store 应用，其应用内部设置不受此路径控制，只能控制 Windows 侧的空间音效选择。
+
+## 2026-09-10 22:46 — 第 12 步：git 基线提交 + DTS 快照实验准备
+- **git 基线**：`cargo init` 时未建仓库，本次创建仓库并提交当前阶段性代码，
+  作为后续改动的回滚点：
+  - `ee2c6b6` chore: 阶段性提交 — HID 多线程监听 + 默认输出设备切换/恢复（15 文件 / 1937 行）；
+  - `0e6cee1` test(experiments): 音频注册表快照/差异对比工具与 DTS 实验基线。
+  - `.gitignore` 排除 `target/`（445MB）、`logs/`、`state.json`、`.idea/`；
+    `.gitattributes` 统一换行为 LF，避免后续 diff 抖动。
+- **实验工具**（`docs/experiments/`）：
+  - `snapshot-audio-registry.ps1`：只读快照（`reg query`），覆盖
+    `HKLM\...\MMDevices`（全树）、`HKLM\...\CurrentVersion\Audio`、
+    `HKCU\SOFTWARE\Microsoft\Multimedia`、DTS 两个 Store 应用的 AppModel 键；
+  - `diff-snapshots.ps1`：两次快照差异对比；
+  - `dts-before.txt`：切换「空间音效」前的基线快照（5226 行）。
+  - 注意：本机只有 Windows PowerShell 5.1，脚本必须以 **UTF-8 with BOM** 保存，
+    否则中文注释会被按 ANSI 解码导致语法错误（已踩坑并修正）。
+- **本轮排除的假设**（避免后续重复排查）：
+  - `FxProperties` 的 `{d3993a3f-99c2-4402-b5ec-a92a0367664b},5/6` = `{C18E2F7E-933D-4965-B7D1-1EEF228D2AF3}`
+    在**所有**渲染端点（含未插拔的）取值完全相同 → 不是用户的“空间音效”选择；
+  - `{C18E2F7E-...}` 未在 `HKLM\SOFTWARE\Classes\CLSID` 注册 → 不是 APO/引擎 CLSID，
+    更像驱动 INF 中的信号处理 Mode GUID；
+  - `HKCU\...\Multimedia\Audio` 下只有 `DefaultEndpoint`（微信的按应用默认设备）与 `DeviceCpl`，
+    没有空间音效选项；DTS 应用的 `HAM\AUI\App\V1\LU` 只有界面时间戳。
+- **待用户操作**：在 Windows 设置里切换一次「空间音效」下拉框，随后拍 `dts-after.txt` 并 diff。
+- 代码状态：回归自测通过（`list`/`status`/`set-default`/`restore`），无残留进程。
