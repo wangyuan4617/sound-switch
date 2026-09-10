@@ -3,7 +3,8 @@
 根据 **HyperX 耳机（USB 无线接收器）的开机/关机数据**，自动把耳机设为/恢复为
 Windows **系统默认输出音频设备** 的小工具（Rust 编写）。
 
-> 参考协议实现：本项目根目录的 `index.js`（监听 VID `1008` / PID `2702` 的 HID 输入报告）。
+> 协议来自对耳机 HID 输入报告的分析：`[0x64,0x01]` = 开机、`[0x64,0x03]` = 关机
+> （VID `1008` / PID `2702`）。
 
 ## 功能
 
@@ -163,33 +164,44 @@ logs\sound_switch.log   （新建，从头开始写）
 
 ```
 sound_switch/
-├─ index.js          # 参考协议实现
-├─ Cargo.toml
+├─ Cargo.toml / Cargo.lock
+├─ .cargo/config.toml # 构建配置（静态链接 CRT，免装 VC++ 运行库）
 ├─ config.json       # 配置（首次运行生成，可手工编辑）
 ├─ state.json        # 切换前默认设备记录（自动维护）
 ├─ logs/             # sound_switch.log / .log.1
 ├─ src/
-│  ├─ main.rs        # CLI
+│  ├─ main.rs        # CLI 入口
+│  ├─ launch.rs      # 无窗口启动器（登录自启用）
 │  ├─ config.rs      # 配置
 │  ├─ log.rs         # 日志（控制台+文件+轮转）
-│  ├─ hid.rs         # HID 监听/解析（多线程）
+│  ├─ hid.rs         # HID 监听/解析（每集合一线程）
 │  ├─ audio.rs       # 音频端点枚举与默认设备切换
 │  ├─ state.rs       # 状态持久化
-│  └─ app.rs         # 事件→动作 主逻辑（后续服务化可复用）
+│  ├─ single_instance.rs # 单实例保护（命名互斥体）
+│  └─ app.rs         # 事件→动作 主逻辑
+├─ scripts/
+│  ├─ install-autostart.ps1    # 安装登录自启
+│  ├─ uninstall-autostart.ps1  # 卸载
+│  └─ make-package.ps1         # 生成便携部署包
+├─ dist/             # 便携包产物（make-package.ps1 生成）
 └─ docs/
    ├─ PLAN.md        # 开发计划
-   └─ PROGRESS.md    # 开发日志（每步记录）
+   ├─ PROGRESS.md    # 开发日志（每步记录）
+   ├─ DEPLOY.md      # 迁移/部署指南
+   └─ experiments/   # DTS 空间音效实验（快照工具与结论）
 ```
 
 ## 已知限制
 
 - 运行时会占用耳机的 HID 集合；若 HyperX 官方软件需要独占访问，两者可能互相影响
   （选择其中一个运行，或在官方软件里释放该设备）。
-- 手动运行阶段需要保持一个控制台窗口；服务化（后台运行、开机自启）在下一阶段实现。
+- 登录时耳机若已处于开机状态且当前默认不是耳机，程序不会主动切换（只响应开关机事件）。
 
 ## 后续计划
 
-- 安装为 Windows 服务 / 开机自启。
+- Windows 服务化（**暂缓**：默认输出设备按登录会话生效，服务在 Session 0 无法直接修改；
+  已用"登录自启计划任务"达成同样效果）。
+- 可选：「启动时状态同步」（覆盖"登录时耳机已开机"的场景），前提是能可靠判断耳机当前开关机状态。
 
 ## 关于 DTS 空间音效（已结案，无需代码）
 

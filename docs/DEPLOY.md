@@ -18,8 +18,22 @@ powershell -ExecutionPolicy Bypass -File scripts\make-package.ps1
 - `dist\sound-switch-portable\`（文件夹，可直接拷）
 - `dist\sound-switch-portable.zip`（压缩包，便于传输）
 
-便携包里已经包含：两个 exe、`config.json`、安装/卸载脚本、说明文档、源码（想重新编译时用）。
-**不包含**旧机器的 `state.json` 和 `logs\`（不需要带过去）。
+便携包默认是**精简版**，只含运行与安装所必需的文件：
+
+```
+sound-switch.exe              # 主程序
+sound-switch-launch.exe       # 无窗口启动器（登录自启用）
+config.json                   # 配置（含调好的设置）
+scripts\install-autostart.ps1
+scripts\uninstall-autostart.ps1
+```
+
+**不包含**旧机器的 `state.json` 和 `logs\`（不需要带过去），也不含文档与源码；
+需要时可用 `-WithDocs` / `-WithSource` 追加：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\make-package.ps1 -WithSource -WithDocs
+```
 
 ### 2. 拷到新电脑
 
@@ -100,22 +114,27 @@ cargo build --release
 
 ## 五、便携包内容清单
 
+默认（精简版）：
+
 ```
 sound-switch-portable\
 ├─ sound-switch.exe              # 主程序（手动调试用，有控制台输出）
 ├─ sound-switch-launch.exe       # 无窗口启动器（登录自启用它）
 ├─ config.json                   # 配置（VID/PID、设备名关键词、角色、日志等）
+└─ scripts\
+   ├─ install-autostart.ps1      # 安装登录自启
+   └─ uninstall-autostart.ps1    # 卸载
+```
+
+加上 `-WithDocs` / `-WithSource` 后会额外包含：
+
+```
 ├─ 部署说明.md                    # 本文件的副本
 ├─ README.md                     # 使用与配置说明
-├─ index.js                      # HID 协议参考实现
-├─ scripts\
-│  ├─ install-autostart.ps1      # 安装登录自启
-│  ├─ uninstall-autostart.ps1    # 卸载
-│  └─ make-package.ps1           # 生成便携包（在旧机器上用）
 ├─ src\                          # 源码（想在新机器重新编译时用）
 ├─ Cargo.toml / Cargo.lock
 ├─ .cargo\config.toml            # 静态链接 CRT 的构建配置
-└─ docs\                         # 开发记录（PLAN / PROGRESS / DEPLOY / 实验结论）
+└─ docs\                         # 开发记录（PLAN / PROGRESS / DEPLOY）
 ```
 
 > `state.json` 与 `logs\` 会在首次运行时自动生成，不属于便携包内容。

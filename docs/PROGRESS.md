@@ -264,3 +264,35 @@
   9 条注意事项：端点 GUID 会变/DTS 需重设/设备名不同怎么改/无需 VC++ 运行库/SmartScreen/
   系统要求/计划任务不随文件夹走/路径建议/旧机清理）。
 - README 增加"迁移到新电脑 / 重装系统"整节与静态链接说明；`.gitignore` 排除 `/dist/`。
+
+## 2026-09-10 23:40 — 第 19 步：清理 index.js 与系统测试启动项；重新打精简包
+### 19.1 删除 `index.js`
+- 用 grep 确认无代码引用（仅文档/注释提到）；协议规则已记录在 README、`docs/PLAN.md`
+  与 `src/hid.rs` 注释中，删除不丢信息。
+- 同步更新引用：README（首段协议说明 + 目录树）、`src/hid.rs` 模块注释、
+  `docs/DEPLOY.md` 包内容清单、`scripts/make-package.ps1` 复制列表。
+
+### 19.2 移除系统中测试用的启动项
+- 通过 `scripts\uninstall-autostart.ps1` 卸载（顺带验证该脚本可用）：
+  ```
+  已删除计划任务: sound-switch
+  已结束正在运行的实例: PID 14004
+  ```
+- 核验：无 `*sound-switch*` 计划任务残留、无进程残留；
+  启动文件夹（`%APPDATA%\...\Startup`）内只有用户自己的 `Snipaste.lnk`，无我们的项。
+- 说明：程序运行期只在自身目录写 `config.json`/`state.json`/`logs\`，不写注册表、不装驱动，
+  因此"清理"= 删任务 + 停进程 + 删文件夹。
+
+### 19.3 重新打包（精简版）
+- `scripts\make-package.ps1` 重构：**默认只打包运行与安装所需文件**
+  （`sound-switch.exe`、`sound-switch-launch.exe`、`config.json`、
+  `scripts\install-autostart.ps1`、`scripts\uninstall-autostart.ps1`）；
+  文档与源码改为可选参数 `-WithDocs` / `-WithSource`。
+- 产物：`dist\sound-switch-portable\`（5 个文件）与 `dist\sound-switch-portable.zip`（0.48 MB）。
+- **实测（解压 zip 到临时目录，不触碰系统）**：
+  - 包内容与预期完全一致（5 个文件）；
+  - `sound-switch.exe list` 正常识别 3 个 HID 集合与耳机端点；
+  - 包内启动器拉起主程序后 `MainWindowHandle=0`（无窗口），
+    日志写入解压目录的 `logs\`（工作目录解析正确）；
+  - 测试进程与临时目录已清理，系统无残留。
+- 交付方式：用户自行把包放到"绿色程序目录"手动安装验证。
