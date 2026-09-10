@@ -322,3 +322,26 @@
   `LastTaskResult=267011`（SCHED_S_TASK_HAS_NOT_RUN，"尚未运行过"），该目录日志为空
   （只跑过 list/status，未真正 `run`）→ 用新的双击脚本重装一次（或 `Start-ScheduledTask`）即可生效。
 - 产物：`dist\sound-switch-portable\`（10 个文件）与 zip（0.49 MB）。
+
+## 2026-09-10 23:58 — 第 21 步：上传 GitHub + 历史隐私清理
+- 仓库：`github.com/wangyuan4617/sound-switch`（分支 `main`，12 个提交）。
+- **本地清理**：运行日志、`state.json`、构建缓存、4 份注册表快照（各约 827KB）全部删除；
+  便携包目录保留（它是交付件，且本就不入库）。
+- **隐私清理（本次重点）**：
+  - 先说结论：**只删除"删除快照的那次提交"没有意义** —— 快照内容仍存在于更早的提交里，
+    任何人 `git show` 都能看到；正确做法是把文件从**全部历史**中抹除。
+  - 文档本机信息占位化（当前版本 + 历史所有版本）：
+    本机项目/安装路径 → `<项目目录>` / `<安装目录>`；
+    音频端点 GUID → `{耳机端点GUID}` / `{原默认端点GUID}`。
+  - 用 `git filter-branch --force --tree-filter` 重写全部 12 个提交：
+    删除 4 份快照 + 清洗文本文件中的本机信息。
+  - 清理 `refs/original`、`reflog expire`、`gc --prune=now`，然后
+    `git push --force-with-lease` 覆盖远端。
+  - **从云端重新克隆核验**：无快照文件、无本机路径/GUID/用户名残留、
+    12 个提交与文件清单完整、仓库体积 85KB。
+  - `.gitignore` 增加 `docs/experiments/dts-*.txt`，避免以后再次误提交快照。
+- **踩坑记录**：`git filter-branch` 的 filter 命令由 MSYS `sh` 执行，
+  **反斜杠会被当作转义符吞掉**（`C:\Users\...` 变成 `C:Users...`）→
+  Windows 路径必须写成正斜杠 `C:/Users/...`；另外用 PowerShell 传含引号的 filter 字符串也会被剥离。
+- **残余风险提示**：GitHub 在强制推送后，旧提交对象可能在一段时间内仍可通过 SHA 直接访问。
+  如需 100% 确定，最稳妥是删除远端仓库后重新创建再推送（仓库刚建、无 fork/star）。
