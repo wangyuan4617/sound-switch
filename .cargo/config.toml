@@ -1,0 +1,15 @@
+# 构建配置：静态链接 C 运行库（CRT）
+#
+# 为什么需要：
+#   Rust 在 windows-msvc 目标上默认动态链接 CRT，生成的 exe 依赖 VCRUNTIME140.dll
+#   （来自 “VC++ 2015-2022 Redistributable”）。全新安装的 Windows 上可能没有这个运行库，
+#   程序会以“找不到 VCRUNTIME140.dll”启动失败。
+#   启用 crt-static 后，exe 不依赖 VC++ 运行库，拷到新电脑即可直接运行（便于迁移/便携部署）。
+#
+# 代价：exe 体积略增（本项目约 +100~200KB），无其它影响。
+#
+# 如需临时关闭（例如排查问题）：
+#   cargo build --release --config 'target.x86_64-pc-windows-msvc.rustflags=[]'
+
+[target.x86_64-pc-windows-msvc]
+rustflags = ["-C", "target-feature=+crt-static"]

@@ -19,8 +19,14 @@ Windows **系统默认输出音频设备** 的小工具（Rust 编写）。
 
 ```powershell
 cargo build --release
-# 产物: target\release\sound-switch.exe
+# 产物（两个）:
+#   target\release\sound-switch.exe          主程序
+#   target\release\sound-switch-launch.exe   无窗口启动器（登录自启用，见下文）
 ```
+
+> 构建配置 `.cargo/config.toml` 启用了 `+crt-static`（静态链接 C 运行库），
+> 因此生成的 exe **不依赖 VC++ 运行库**，全新系统也能直接运行（便于迁移）。
+> 如需临时关闭：`cargo build --release --config 'target.x86_64-pc-windows-msvc.rustflags=[]'`。
 
 ## 使用
 
@@ -272,3 +278,38 @@ Get-Content logs\sound_switch.log -Tail 3 -Encoding UTF8   # 末尾应有当次�
 - 修改 `config.json` 后需要重启后台实例（`Get-Process sound-switch | Stop-Process` 再
   `Start-ScheduledTask -TaskName sound-switch`）。
 - 重新编译前必须先停掉后台实例（Windows 会锁定正在运行的 exe）。
+
+---
+
+# 迁移到新电脑 / 重装系统
+
+**一句话：整个文件夹拷过去就行**（本程序是"绿色"的，配置、状态、日志都在自己目录里，
+不写系统目录、无安装过程）。详细步骤见 `docs/DEPLOY.md`。
+
+## 生成便携包（推荐）
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\make-package.ps1
+# 产物：
+#   dist\sound-switch-portable\        整个文件夹可直接拷走
+#   dist\sound-switch-portable.zip     压缩包（便于传输）
+```
+
+包里含：两个 exe、`config.json`、安装/卸载脚本、说明文档、源码（想在新机器重新编译时用）；
+**不含** `state.json` 与 `logs\`（会在首次运行时自动生成）。
+
+## 新电脑上的三步
+
+```powershell
+cd D:\tools\sound-switch          # 便携包放哪都行
+.\sound-switch.exe list                                          # ① 确认能看到耳机
+.\sound-switch.exe set-default ; .\sound-switch.exe restore       # ② 验证切换/恢复
+powershell -ExecutionPolicy Bypass -File scripts\install-autostart.ps1 -StartNow   # ③ 装自启
+```
+
+## 两个容易忽略的点
+
+1. **不要拷贝旧机器的 `state.json`**：音频端点 GUID 在新机器上会不同，
+   程序按 `config.json` 里的 `audio_keyword`（设备名关键词）在运行时查找设备，因此不需要 GUID。
+2. **DTS 空间音效要在新机器上重设一次**：该设置按音频端点保存在注册表里，不跟着程序走 ——
+   设置 → 系统 → 声音 → 耳机 → 空间音效 → **DTS Headphone:X**（设置一次即长期有效）。

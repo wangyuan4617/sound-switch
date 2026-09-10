@@ -7,13 +7,14 @@
 //!
 //! 行为：
 //!   - 找到与自己同目录的 sound-switch.exe，以 `run` 参数启动后立即退出；
-//!   - 工作目录：优先沿用当前目录（计划任务里设置的是项目根目录）；
-//!     若当前目录没有 config.json，则回退到项目根目录（exe 上两级：target\release\..\..）。
+//!   - 工作目录：优先沿用当前目录（计划任务里设置的是程序根目录）；
+//!     若当前目录没有 config.json，则依次回退：exe 所在目录 → 上一级 → 上两级
+//!     （分别对应便携包结构、bin\ 结构、target\release\ 开发结构）。
 
 #![windows_subsystem = "windows"]
 
 use std::os::windows::process::CommandExt;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 
 /// Win32: 以无窗口方式创建控制台进程
@@ -41,12 +42,20 @@ fn spawn_agent() -> i32 {
     let mut cmd = Command::new(&target);
     cmd.arg("run");
 
-    // 若当前目录不是项目根目录（没有 config.json），回退到 exe 上两级
+    // 工作目录：优先沿用当前目录；否则按候选目录回退到含 config.json 的那个
     if !Path::new("config.json").exists() {
-        if let Some(root) = exe_dir.parent().and_then(|p| p.parent()) {
-            if root.join("config.json").exists() {
-                cmd.current_dir(root);
+        let mut candidates: Vec<PathBuf> = vec![exe_dir.clone()];
+        if let Some(p) = exe_dir.parent() {
+            candidates.push(p.to_path_buf());
+            if let Some(pp) = p.parent() {
+                candidates.push(pp.to_path_buf());
             }
+        }
+        if let Some(root) = candidates
+            .into_iter()
+            .find(|d| d.join("config.json").exists())
+        {
+            cmd.current_dir(root);
         }
     }
 

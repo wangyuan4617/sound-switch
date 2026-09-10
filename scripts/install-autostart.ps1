@@ -39,18 +39,25 @@ param(
 $ErrorActionPreference = 'Stop'
 
 $root = Split-Path -Parent $PSScriptRoot
-if (-not $ExePath) {
-    if ($NoLauncher) {
-        $ExePath = Join-Path $root 'target\release\sound-switch.exe'
-    } else {
-        $ExePath = Join-Path $root 'target\release\sound-switch-launch.exe'
-    }
-}
 if (-not $WorkDir) { $WorkDir = $root }
 
-if (-not (Test-Path $ExePath)) {
-    throw "找不到可执行文件: $ExePath  —— 请先执行: cargo build --release"
+# 自动查找可执行文件：兼容两种目录结构
+#   1) 便携包结构：exe 与 config.json 同在包根目录（拷贝到新电脑后的形态）
+#   2) 开发结构  ：exe 在 target\release\
+$exeName = if ($NoLauncher) { 'sound-switch.exe' } else { 'sound-switch-launch.exe' }
+if (-not $ExePath) {
+    $candidates = @(
+        (Join-Path $root $exeName),
+        (Join-Path $root "bin\$exeName"),
+        (Join-Path $root "target\release\$exeName")
+    )
+    $ExePath = $candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
 }
+
+if (-not $ExePath -or -not (Test-Path $ExePath)) {
+    throw "找不到 $exeName —— 请先执行 cargo build --release，或把便携包里的 exe 与本脚本放在同一目录结构下"
+}
+
 $argument = if ($NoLauncher) { 'run' } else { '' }
 if (-not (Test-Path (Join-Path $WorkDir 'config.json'))) {
     Write-Warning "工作目录下没有 config.json（首次运行会自动生成）: $WorkDir"
