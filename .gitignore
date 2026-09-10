@@ -1,0 +1,10 @@
+# 编译产物（体积大，不入库）
+/target/
+
+# 运行时生成
+/logs/
+/state.json
+*.log
+
+# IDE
+/.idea/

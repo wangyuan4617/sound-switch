@@ -1,0 +1,16 @@
+{
+  "vendor_id": 1008,
+  "product_id": 2702,
+  "audio_keyword": "HyperX Cloud Stinger Core Wireless",
+  "roles": [
+    "console",
+    "multimedia",
+    "communications"
+  ],
+  "rescan_interval_ms": 2000,
+  "read_timeout_ms": 500,
+  "endpoint_wait_ms": 15000,
+  "dry_run": false,
+  "log_level": "info",
+  "log_max_kb": 512
+}

@@ -1,0 +1,7 @@
+# 统一文本换行，避免 Windows/Linux 协作时 diffs 抖动
+* text=auto
+*.rs text eol=lf
+*.toml text eol=lf
+*.md text eol=lf
+*.json text eol=lf
+*.js text eol=lf
