@@ -18,14 +18,19 @@ powershell -ExecutionPolicy Bypass -File scripts\make-package.ps1
 - `dist\sound-switch-portable\`（文件夹，可直接拷）
 - `dist\sound-switch-portable.zip`（压缩包，便于传输）
 
-便携包默认是**精简版**，只含运行与安装所必需的文件：
+便携包默认是**精简版**，只含运行、安装与说明所必需的文件：
 
 ```
 sound-switch.exe              # 主程序
 sound-switch-launch.exe       # 无窗口启动器（登录自启用）
 config.json                   # 配置（含调好的设置）
-scripts\install-autostart.ps1
+使用说明.txt                   # 使用说明（UTF-8 with BOM，记事本可读）
+安装登录自启.bat              # ← 双击安装
+卸载登录自启.bat              # ← 双击卸载
+查看运行状态.bat              # ← 双击查看状态/日志
+scripts\install-autostart.ps1 # 命令行用法
 scripts\uninstall-autostart.ps1
+scripts\status.ps1
 ```
 
 **不包含**旧机器的 `state.json` 和 `logs\`（不需要带过去），也不含文档与源码；
@@ -40,21 +45,25 @@ powershell -ExecutionPolicy Bypass -File scripts\make-package.ps1 -WithSource -W
 把文件夹（或 zip 解压后）放到合适位置，例如 `D:\tools\sound-switch`。
 
 > 建议放**英文路径**；中文/空格路径一般也能用，但未充分测试。
-> 程序对目录位置没有要求 —— 脚本会自动按"脚本所在位置"推导工作目录。
+> 程序对目录位置没有要求 —— 脚本会自动按"脚本所在位置"推导工作目录，
+> 移动文件夹后重新双击一次「安装登录自启.bat」即可让计划任务指向新位置
+> （若原任务指向别的目录，脚本会先给出提示）。
 
-### 3. 在新电脑上验证（3 条命令）
+### 3. 在新电脑上安装：**双击即可**
+
+```
+① 双击「安装登录自启.bat」   → 注册登录自启 + 立即后台启动（无窗口）；
+                              结束时提示"按回车键关闭窗口"，不会一闪而过
+② 双击「查看运行状态.bat」   → 一屏确认：任务、进程（窗口应为"无窗口"）、日志、当前默认输出
+③ 取消时：双击「卸载登录自启.bat」
+```
+
+想用命令行时（等价）：
 
 ```powershell
 cd D:\tools\sound-switch
-
-# ① 能否看到耳机：应列出匹配的 HID 集合，且渲染端点里有"关键词匹配"标记
-.\sound-switch.exe list
-
-# ② 手动验证切换/恢复是否可用
-.\sound-switch.exe set-default     # 切到耳机
-.\sound-switch.exe restore         # 恢复切换前的设备
-
-# ③ 安装登录自启（并立即启动一次）
+.\sound-switch.exe list                                        # 确认能看到耳机
+.\sound-switch.exe set-default ; .\sound-switch.exe restore     # 验证切换/恢复
 powershell -ExecutionPolicy Bypass -File scripts\install-autostart.ps1 -StartNow
 ```
 
@@ -78,11 +87,17 @@ Get-Content .\logs\sound_switch.log -Tail 3 -Encoding UTF8
 sound-switch.exe
 sound-switch-launch.exe
 config.json
+使用说明.txt
+安装登录自启.bat
+卸载登录自启.bat
+查看运行状态.bat
 scripts\install-autostart.ps1
 scripts\uninstall-autostart.ps1
+scripts\status.ps1
 ```
 
-然后在那个文件夹里运行 install 脚本即可（脚本会自动找到同目录的 exe）。
+然后在那个文件夹里双击「安装登录自启.bat」即可
+（脚本会自动找到同目录的 exe 与 `scripts\` 下的 PowerShell 脚本）。
 
 ## 三、在新电脑上从源码编译（可选）
 
@@ -121,10 +136,18 @@ sound-switch-portable\
 ├─ sound-switch.exe              # 主程序（手动调试用，有控制台输出）
 ├─ sound-switch-launch.exe       # 无窗口启动器（登录自启用它）
 ├─ config.json                   # 配置（VID/PID、设备名关键词、角色、日志等）
+├─ 使用说明.txt                   # 使用说明（记事本可直接打开）
+├─ 安装登录自启.bat              # ← 双击安装
+├─ 卸载登录自启.bat              # ← 双击卸载
+├─ 查看运行状态.bat              # ← 双击查看状态/日志
 └─ scripts\
-   ├─ install-autostart.ps1      # 安装登录自启
-   └─ uninstall-autostart.ps1    # 卸载
+   ├─ install-autostart.ps1      # 安装（命令行用法，-Pause 可让窗口停留）
+   ├─ uninstall-autostart.ps1    # 卸载
+   └─ status.ps1                 # 查看运行状态
 ```
+
+> 三个 `.bat` 的内容是纯 ASCII（避免 cmd 编码问题）+ CRLF，只负责调用 PowerShell；
+> 中文提示全部由 PowerShell 脚本输出，因此双击后能正常显示中文并等待回车。
 
 加上 `-WithDocs` / `-WithSource` 后会额外包含：
 
@@ -138,3 +161,4 @@ sound-switch-portable\
 ```
 
 > `state.json` 与 `logs\` 会在首次运行时自动生成，不属于便携包内容。
+> `.bat` 与 `使用说明.txt` 的源文件位于项目的 `packaging\` 目录，便于单独修改。

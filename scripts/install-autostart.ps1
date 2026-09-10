@@ -23,6 +23,9 @@
 .PARAMETER NoLauncher
     不走启动器，直接运行 sound-switch.exe run（会带出可见控制台窗口，仅用于排查问题）。
 
+.PARAMETER Pause
+    结束时等待回车再退出（供双击 .bat 运行时使用，避免窗口一闪而过）。
+
 .EXAMPLE
     powershell -ExecutionPolicy Bypass -File scripts\install-autostart.ps1
     powershell -ExecutionPolicy Bypass -File scripts\install-autostart.ps1 -StartNow
@@ -33,7 +36,8 @@ param(
     [string]$ExePath,
     [string]$WorkDir,
     [switch]$StartNow,
-    [switch]$NoLauncher
+    [switch]$NoLauncher,
+    [switch]$Pause
 )
 
 $ErrorActionPreference = 'Stop'
@@ -80,6 +84,15 @@ $settings = New-ScheduledTaskSettingsSet `
     -ExecutionTimeLimit (New-TimeSpan -Seconds 0)
 $principal = New-ScheduledTaskPrincipal -UserId $user -LogonType Interactive -RunLevel Limited
 
+# 若已存在同名任务且指向别的目录（比如程序被移动过），先提示一下
+$existing = Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
+if ($existing -and $existing.Actions[0].Execute -and $existing.Actions[0].Execute -ne $ExePath) {
+    Write-Warning "检测到已存在的计划任务 $TaskName 指向另一个位置："
+    Write-Warning ("    原执行程序: " + $existing.Actions[0].Execute)
+    Write-Warning ("    本次将更新为: " + $ExePath)
+    Write-Output ""
+}
+
 Register-ScheduledTask -TaskName $TaskName -Action $action -Trigger $trigger `
     -Settings $settings -Principal $principal -Force `
     -Description 'sound-switch: 耳机开机时把默认输出切到耳机、关机时恢复（登录时自动运行，无窗口）' | Out-Null
@@ -103,8 +116,23 @@ if ($StartNow) {
     Start-Sleep -Seconds 2
     $p = Get-Process sound-switch -ErrorAction SilentlyContinue
     if ($p) {
-        Write-Output ("`n已启动，正在运行: PID " + ($p.Id -join ', '))
+        Write-Output ""
+        Write-Output ("已立即启动，正在后台运行: PID " + ($p.Id -join ', '))
     } else {
         Write-Warning "任务已触发但未发现进程，请查看 logs\sound_switch.log"
     }
+}
+
+Write-Output ""
+Write-Output "================== 安装完成 =================="
+Write-Output "接下来："
+Write-Output "  1) 现在就已经在后台运行了（无窗口）；重新登录/重启后也会自动启动"
+Write-Output "  2) 开关一次耳机电源，观察系统默认输出设备是否自动切换/恢复"
+Write-Output ("  3) 日志文件: " + (Join-Path $WorkDir 'logs\sound_switch.log'))
+Write-Output "  4) 想取消：双击「卸载登录自启.bat」或运行 scripts\uninstall-autostart.ps1"
+
+if ($Pause) {
+    Write-Output ""
+    Write-Output "-------------------------------------------------------"
+    try { Read-Host "按回车键关闭窗口" | Out-Null } catch { }
 }

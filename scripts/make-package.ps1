@@ -3,15 +3,21 @@
     生成“绿色便携包”，便于拷到新电脑 / 重装系统后直接使用。
 
 .DESCRIPTION
-    默认产物（精简，只含运行与安装所必需的文件）：
+    默认产物（精简，只含运行、安装与说明所必需的文件）：
       <dist>\sound-switch-portable\
         sound-switch.exe            主程序
         sound-switch-launch.exe     无窗口启动器（登录自启用）
         config.json                 配置（含当前调好的设置）
+        使用说明.txt                 使用说明（UTF-8 with BOM，记事本可读）
+        安装登录自启.bat             ← 双击安装
+        卸载登录自启.bat             ← 双击卸载
+        查看运行状态.bat             ← 双击查看状态/日志
         scripts\install-autostart.ps1
         scripts\uninstall-autostart.ps1
+        scripts\status.ps1
       <dist>\sound-switch-portable.zip   压缩包（便于传输）
 
+    .bat 与 使用说明.txt 的源文件放在项目的 packaging\ 目录，方便单独维护。
     不含：state.json、logs\、target\、文档、源码（后两者可用 -WithDocs / -WithSource 追加）。
 
 .PARAMETER WithDocs
@@ -76,13 +82,21 @@ Copy-Item $exeLauncher (Join-Path $pkg 'sound-switch-launch.exe') -Force
 # 2.2 配置：带上当前调好的设置（不含任何机器相关信息，换机可直接用）
 Copy-Item (Join-Path $root 'config.json') (Join-Path $pkg 'config.json') -Force
 
-# 2.3 安装 / 卸载脚本
+# 2.3 命令行用的 PowerShell 脚本
 New-Item -ItemType Directory -Path (Join-Path $pkg 'scripts') -Force | Out-Null
-foreach ($s in 'install-autostart.ps1', 'uninstall-autostart.ps1') {
+foreach ($s in 'install-autostart.ps1', 'uninstall-autostart.ps1', 'status.ps1') {
     Copy-Item (Join-Path $root "scripts\$s") (Join-Path $pkg "scripts\$s") -Force
 }
 
-# 2.4 可选：文档
+# 2.4 双击即可用的入口（.bat）与「使用说明.txt」（源文件在 packaging\ 目录）
+$packSrc = Join-Path $root 'packaging'
+if (Test-Path $packSrc) {
+    Copy-Item (Join-Path $packSrc '*') $pkg -Force
+} else {
+    Write-Warning "未找到 packaging\ 目录：双击脚本与使用说明将不会打进包里"
+}
+
+# 2.5 可选：文档
 if ($WithDocs) {
     New-Item -ItemType Directory -Path (Join-Path $pkg 'docs') -Force | Out-Null
     Get-ChildItem (Join-Path $root 'docs') -Filter *.md -File | ForEach-Object {
@@ -92,7 +106,7 @@ if ($WithDocs) {
     Copy-Item (Join-Path $root 'docs\DEPLOY.md') (Join-Path $pkg '部署说明.md') -Force
 }
 
-# 2.5 可选：源码与构建配置
+# 2.6 可选：源码与构建配置
 if ($WithSource) {
     Copy-Item (Join-Path $root 'src') (Join-Path $pkg 'src') -Recurse -Force
     foreach ($f in 'Cargo.toml', 'Cargo.lock') {
@@ -127,10 +141,10 @@ if (-not ($WithDocs -and $WithSource)) {
     Write-Output "  （如需附带文档/源码：加 -WithDocs / -WithSource 参数重新生成）"
 }
 Write-Output ""
-Write-Output "新电脑上的使用步骤："
-Write-Output "  1. 把文件夹（或解压后的 zip）放到任意位置，例如 D:\GreenTools\sound-switch"
-Write-Output "  2. cd 到该目录；.\sound-switch.exe list        # 确认能看到耳机 HID 与音频端点"
-Write-Output "  3. .\sound-switch.exe set-default              # 手动验证切换（再用 restore 恢复）"
-Write-Output "  4. powershell -ExecutionPolicy Bypass -File scripts\install-autostart.ps1 -StartNow"
+Write-Output "使用方法（把文件夹放到任意位置后）："
+Write-Output "  安装    ：双击「安装登录自启.bat」"
+Write-Output "  看状态  ：双击「查看运行状态.bat」"
+Write-Output "  卸载    ：双击「卸载登录自启.bat」"
+Write-Output "  详见    ：包内「使用说明.txt」"
 Write-Output ""
 Write-Output "提醒：新电脑上重设一次 设置 → 系统 → 声音 → 耳机 → 空间音效 → DTS Headphone:X"

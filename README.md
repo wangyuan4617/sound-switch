@@ -307,16 +307,27 @@ powershell -ExecutionPolicy Bypass -File scripts\make-package.ps1
 #   dist\sound-switch-portable.zip     压缩包（便于传输）
 ```
 
-包里含：两个 exe、`config.json`、安装/卸载脚本、说明文档、源码（想在新机器重新编译时用）；
-**不含** `state.json` 与 `logs\`（会在首次运行时自动生成）。
+包里含：两个 exe、`config.json`、**`使用说明.txt`**、三个**双击即可用**的 `.bat`
+（安装 / 卸载 / 查看状态）、`scripts\*.ps1`（命令行用法）。
+**不含** `state.json` 与 `logs\`（首次运行时自动生成），也不含文档与源码
+（需要时加 `-WithDocs` / `-WithSource`）。
 
-## 新电脑上的三步
+## 新电脑上：双击就行
+
+```
+1. 把文件夹放到任意位置（例如 D:\GreenTools\sound-switch）
+2. 双击「安装登录自启.bat」   ← 自动注册登录自启 + 立即后台启动（无窗口），
+                                结束时会提示"按回车键关闭窗口"
+3. 双击「查看运行状态.bat」   ← 确认任务/进程/日志/当前默认输出
+4. 取消：双击「卸载登录自启.bat」
+```
+
+命令行等价用法（可选）：
 
 ```powershell
-cd D:\tools\sound-switch          # 便携包放哪都行
-.\sound-switch.exe list                                          # ① 确认能看到耳机
-.\sound-switch.exe set-default ; .\sound-switch.exe restore       # ② 验证切换/恢复
-powershell -ExecutionPolicy Bypass -File scripts\install-autostart.ps1 -StartNow   # ③ 装自启
+.\sound-switch.exe list                                          # 确认能看到耳机
+.\sound-switch.exe set-default ; .\sound-switch.exe restore       # 验证切换/恢复
+powershell -ExecutionPolicy Bypass -File scripts\install-autostart.ps1 -StartNow   # 装自启
 ```
 
 ## 两个容易忽略的点
