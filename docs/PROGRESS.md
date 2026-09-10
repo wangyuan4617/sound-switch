@@ -121,3 +121,25 @@
     没有空间音效选项；DTS 应用的 `HAM\AUI\App\V1\LU` 只有界面时间戳。
 - **待用户操作**：在 Windows 设置里切换一次「空间音效」下拉框，随后拍 `dts-after.txt` 并 diff。
 - 代码状态：回归自测通过（`list`/`status`/`set-default`/`restore`），无残留进程。
+
+## 2026-09-10 22:53 — 第 13 步：DTS 快照实验完成（结论已定）
+- 用户把耳机端点的「空间音效」从**关闭**改为 **DTS Headphone:X**；对比快照得到结论，
+  详见 `docs/experiments/FINDINGS.md`。
+- **变化位置**：仅耳机端点
+  `HKLM\...\MMDevices\Audio\Render\{耳机端点GUID}\Properties`；
+  `HKCU\SOFTWARE\Microsoft\Multimedia`、DTS 应用 AppModel 键、`HKLM\...\CurrentVersion\Audio` 全无变化
+  → 该设置**只写在 HKLM 端点属性**里（普通用户对该键只读）。
+- **解码出的格式映射**（`{a45429a4-...}` pid2~6，内容本身未变，仅头部 2 字节噪声）：
+  Windows Sonic `b53d940c-…`、Dolby Atmos for Headphones `1459ac38-…`、
+  Dolby Atmos for built-in speakers `4c81e564-…`、
+  **DTS Headphone:X `4444acb0-8dc0-4c2c-a0d8-2c76db470f86`**、DTS:X Ultra `adafd3c6-…`。
+- **真正记录"当前生效引擎"的三处属性**：
+  `{908dba32-…},2`（当前引擎 GUID + 标志位，Windows Sonic → DTS）、
+  `{8a845654-…},2`（激活引擎 GUID，全零 → DTS）、
+  `{fd8a7b27-…},2`（空间音频配置，9B 空 → 154B：DTS GUID + float32 参数数组）。
+- **结论**：机制上"设置系统空间音效格式"就是正确做法（与 SoundVolumeView `/SetSpatial` 等价），
+  但没有简单开关值，写的是未公开二进制结构且位于 HKLM → 自行实现需管理员权限 + 逆向，风险高；
+  推荐方案 A（调用 `SoundVolumeView.exe /SetSpatial`），或先验证"只需设置一次即长期有效"。
+- **下一步**：开关一次耳机电源做持久性测试（对比 `dts-current.txt`）；
+  若会重置再决定集成方式，并确认该工具在非管理员会话下是否可用。
+- 新增文件：`docs/experiments/FINDINGS.md`、`dts-after.txt`、`dts-current.txt`。
