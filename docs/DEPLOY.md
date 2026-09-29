@@ -2,7 +2,8 @@
 
 > 本程序是"绿色"的：所有状态（`config.json`、`state.json`、`logs\`）都在程序自己的文件夹里，
 > 不写系统目录、不依赖安装过程。**整个文件夹拷过去就是全部**，唯一需要在新机器上重做的是
-> 「注册登录自启任务」这一步（以及 DTS 空间音效的手动设置一次）。
+> 「注册登录自启任务」这一步；DTS Headphone:X 音效由程序在切换到耳机时自动启用
+> （前提是新机器装好 DTS Sound Unbound，见第四节第 2 条）。
 
 ## 一、推荐流程：用便携包（新电脑不需要装 Rust）
 
@@ -118,7 +119,7 @@ cargo build --release
 | # | 事项 | 说明 |
 |---|---|---|
 | 1 | **音频端点 GUID 会变** | 不用管：程序按 `config.json` 里的 `audio_keyword`（名称关键词）在运行时查找设备，不依赖 GUID。**不要把旧机器的 `state.json` 拷过来**（那是旧机器的记录，没有意义）。 |
-| 2 | **DTS 空间音效要重设一次** | 该设置按音频端点保存在注册表里，不会跟着程序走。设置一次即长期有效：**设置 → 系统 → 声音 → 耳机 → 空间音效 → DTS Headphone:X**（需先在新机器装好 DTS Sound Unbound）。详见 `docs/experiments/FINDINGS.md`。 |
+| 2 | **DTS Headphone:X 已可自动启用** | 先在新机器装好 **DTS Sound Unbound**（微软商店，或用耳机/主板厂商提供的版本）。程序在切换到耳机时会自动启动它、等授权完成（界面卡片变「已授权」）、必要时自动点「更新许可证」，然后关闭应用 —— 不需要手动设置「空间音效」。若新机器上应用 ID 不同（`Get-StartApps` 可查），改 `config.json` 的 `dts_aumid`；不想启用就设 `dts_enabled: false`。原理与实测见 `docs/experiments/FINDINGS.md` 第七节。 |
 | 3 | **设备名不同怎么办** | 先 `.\sound-switch.exe list` 看实际名字，把 `config.json` 的 `audio_keyword` 改成实际名称里的独特片段（例如 `HyperX Cloud Stinger Core Wireless`）；换的是别的耳机型号，还要改 `vendor_id` / `product_id`（用 `list` 里的 `VID_xxxx&PID_xxxx` 换算成十进制）。 |
 | 4 | **无需 VC++ 运行库** | exe 已静态链接 C 运行库（`.cargo/config.toml` 中的 `+crt-static`），依赖只剩 Windows 系统 DLL，全新系统也能直接跑。 |
 | 5 | **SmartScreen 提示** | exe 未签名，首次运行可能提示"Windows 已保护你的电脑" → 点「更多信息」→「仍要运行」。 |

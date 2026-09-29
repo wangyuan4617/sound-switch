@@ -84,6 +84,12 @@ dry_run                  演练模式：true 时只打印将要执行的动作�
 log_level                日志级别：info（默认，只打印开关机等关键事件）
                          / debug（额外打印音量、原始 HID 数据，用于排查）
 log_max_kb               单个日志文件大小上限（默认 512KB）
+dts_enabled              切换到耳机时是否自动确保 DTS Headphone:X 已启用（默认 true）
+dts_aumid                DTS Sound Unbound 的应用 ID；留空则不启用本功能
+dts_window_title         识别应用窗口用的标题（默认 DTS Sound Unbound）
+dts_licensed_text        授权卡上表示已生效的文字（默认：已授权）
+dts_arm_timeout_ms       等待授权完成的上限（默认 90000）
+dts_close_after          授权完成后是否关闭 DTS Sound Unbound（默认 true）
 
 
 ========================================================
@@ -92,9 +98,10 @@ log_max_kb               单个日志文件大小上限（默认 512KB）
 把整个文件夹拷到新电脑 → 双击「安装登录自启.bat」即可。
 注意两点：
 1) 不要拷贝 state.json（新电脑的音频设备编号不同，程序会自动重新识别耳机）
-2) DTS 空间音效要在新电脑上重设一次（该设置保存在系统里，不跟着程序走）：
-   设置 → 系统 → 声音 → 选择耳机 → 空间音效 → DTS Headphone:X
-   设置一次即可长期有效，不会因为耳机开关机而重置。
+2) 新电脑上要先装好 DTS Sound Unbound（微软商店，或用耳机/主板厂商提供的版本）；
+   本程序会在切换到耳机时自动启动它完成 DTS 授权，再把它关掉，不需要你手动操作。
+   如果新电脑上的应用 ID 不同（PowerShell 里执行 Get-StartApps 可查看），
+   把 config.json 的 dts_aumid 改成新值即可；不想自动启动就设 dts_enabled: false。
 
 
 ========================================================

@@ -39,7 +39,10 @@ cargo build --release
 .\target\release\sound-switch.exe set-default   # 模拟“关机→开机”：切到耳机
 .\target\release\sound-switch.exe restore       # 模拟“开机→关机”：恢复原默认
 
-# 3. 正式监听
+# 3. 手动测试 DTS 音效启用流程（启动 App → 完成授权 → 关闭 App）
+.\target\release\sound-switch.exe dts-arm
+
+# 4. 正式监听
 .\target\release\sound-switch.exe run
 
 # 辅助查看
@@ -69,6 +72,12 @@ cargo build --release
 | `dry_run` | true/false | `false` | 演练模式：只打印将要执行的动作，不真正切换默认设备 |
 | `log_level` | 字符串 | `info` | 日志级别：`error` / `warn` / `info` / `debug` |
 | `log_max_kb` | 数字(KB) | `512` | 单个日志文件大小上限，超出后轮转 |
+| `dts_enabled` | true/false | `true` | 切换到耳机时是否自动确保 **DTS Headphone:X** 音效已启用（见下文专节） |
+| `dts_aumid` | 字符串 | `DTSInc.DTSSoundUnbound_t5j2fzbtdg37r!App` | DTS Sound Unbound 的 AUMID；留空则不启用本功能 |
+| `dts_window_title` | 字符串 | `DTS Sound Unbound` | 兜底识别应用窗口用的标题（正常按进程识别，用不到） |
+| `dts_licensed_text` | 字符串 | `已授权` | 授权卡上表示“已生效”的文字（App 换语言时改这里） |
+| `dts_arm_timeout_ms` | 数字(ms) | `90000` | 等待授权完成的上限；App 首次自检可能要几十秒 |
+| `dts_close_after` | true/false | `true` | 确认授权完成后关闭 DTS Sound Unbound（实测关闭后音效仍保留） |
 
 ## 逐项详解
 
@@ -149,6 +158,9 @@ logs\sound_switch.log   （新建，从头开始写）
 | 排查“为什么没切换” | `log_level: "debug"`，再看 `logs\sound_switch.log` |
 | 耳机端点出现慢 | `endpoint_wait_ms: 30000` |
 | 日志想留更久 | `log_max_kb: 2048` |
+| 不想自动启动 DTS Sound Unbound | `dts_enabled: false` |
+| 想让 DTS App 常驻后台（不再每次拉起，也就没有窗口闪一下） | `dts_close_after: false` |
+| 换了别的 DTS 应用/语言 | `dts_aumid`、`dts_window_title`、`dts_licensed_text` |
 
 ## 工作原理（简述）
 
@@ -176,6 +188,7 @@ sound_switch/
 │  ├─ log.rs         # 日志（控制台+文件+轮转）
 │  ├─ hid.rs         # HID 监听/解析（每集合一线程）
 │  ├─ audio.rs       # 音频端点枚举与默认设备切换
+│  ├─ dts.rs         # DTS Headphone:X 的静默启用（启动 App / UI 自动化 / 关闭）
 │  ├─ state.rs       # 状态持久化
 │  ├─ single_instance.rs # 单实例保护（命名互斥体）
 │  └─ app.rs         # 事件→动作 主逻辑
@@ -188,7 +201,13 @@ sound_switch/
    ├─ PLAN.md        # 开发计划
    ├─ PROGRESS.md    # 开发日志（每步记录）
    ├─ DEPLOY.md      # 迁移/部署指南
-   └─ experiments/   # DTS 空间音效实验（快照工具与结论）
+   └─ experiments/   # DTS 空间音效实验（快照/差异工具与结论）
+      ├─ FINDINGS.md              # 实验结论（含 2026-09-29 的结论修正）
+      ├─ snapshot-audio-registry.ps1 / diff-snapshots.ps1
+      ├─ dump-dts-uia.ps1         # 导出 DTS App 的 UI Automation 树
+      ├─ dts-enable-prototype.ps1 # 原型：静默启动 + 读授权 + 触发更新
+      ├─ trace-dts-windows.ps1 / probe-dts-windows.ps1  # 窗口/关闭行为探测
+      └─ dts-uia-*.txt            # UI 树快照（本机信息，不入库）
 ```
 
 ## 已知限制
@@ -196,6 +215,8 @@ sound_switch/
 - 运行时会占用耳机的 HID 集合；若 HyperX 官方软件需要独占访问，两者可能互相影响
   （选择其中一个运行，或在官方软件里释放该设备）。
 - 登录时耳机若已处于开机状态且当前默认不是耳机，程序不会主动切换（只响应开关机事件）。
+- DTS 音效的自动启用依赖 DTS Sound Unbound 的界面控件（UI 自动化）：应用升级后若控件
+  id 变化，流程会失败并只记日志（可改 `dts_*` 配置或关闭该功能），不影响默认设备切换。
 
 ## 后续计划
 
@@ -203,15 +224,46 @@ sound_switch/
   已用"登录自启计划任务"达成同样效果）。
 - 可选：「启动时状态同步」（覆盖"登录时耳机已开机"的场景），前提是能可靠判断耳机当前开关机状态。
 
-## 关于 DTS 空间音效（已结案，无需代码）
+## 关于 DTS 空间音效（自动启用，见 `src/dts.rs`）
 
-实测结论：Windows 的「空间音效」设置是**按音频端点持久保存**的，开关耳机电源**不会重置**，
-因此只需**手动设置一次**即可长期有效：
+**先说结论：光改注册表/只设一次「空间音效」是不够的**，必须让
+**DTS Sound Unbound** 这个 UWP 应用跑一次完成授权握手，DTS 效果才真正生效。
+本程序已把这一步自动化了。
 
-> 设置 → 系统 → 声音 → 选择耳机 → 空间音效 → **DTS Headphone:X**
+### 为什么"只改注册表"不行（实测证据）
 
-本程序无需介入（既不需要调用第三方工具，也不需要写注册表）。
-完整的实验方法、注册表证据与结论见 `docs/experiments/FINDINGS.md`。
+| 结论 | 证据 |
+|---|---|
+| 「空间音效 = DTS Headphone:X」只是**端点属性**，写它不等于启用 | 属性写在 `HKLM\...\MMDevices\Audio\Render\{GUID}\Properties`；本机实测把 App 杀掉前后，这些属性**一个字节都没变**，但效果确实没了 → 授权是运行期行为 |
+| 真正启用效果的是 **DTS Sound Unbound**（UWP 应用） | 它的清单里注册了 `LicenseService` 应用服务、`DeviceWatcher` 后台任务和 DTS 空间音效引擎 GUID；启动后它会与系统服务 `DTSAPO3Service` 完成授权，界面上主页那张卡从「未授权」变成「已授权」 |
+| **没有任何"纯 API/纯注册表"的替代路径** | 该应用没有命令行接口、没有公开文档；社区（中/德/英文）一致结论是"开机后要手动开一次 App"，官方 FAQ 也只说 "install and **run** the application" |
+| 一旦授权完成，**关掉 App 效果仍然保留**（本次 Windows 会话内） | 实测：确认「已授权」后关闭 App，音效照常；因此可以"用完就关" |
+
+### 程序怎么做（对应需求：切到耳机时启用，切走时不动）
+
+1. 检测到**耳机开机 → 默认输出切换到耳机**后，按 AUMID 启动 DTS Sound Unbound；
+2. 立刻把它的窗口移到屏幕外（`x=-32000`，保持"可见"以免被 UWP 生命周期挂起），
+   用户看不到窗口；
+3. 用 **UI Automation** 读主页授权卡（`DTSXHPNewLicenseTile`）：
+   - 出现「已授权」→ 认为已生效；
+   - 一直是「未授权」或状态不明 → 自动触发「更多选项 → 更新许可证」
+     （`Dotsx3Button` → `RefreshLicensesButton`，即平时手点的那一下），最多 3 次；
+4. 确认成功后**关闭 DTS Sound Unbound**（`dts_close_after`）。
+
+**切换到非耳机（关机/恢复）时不做任何 DTS 操作。**
+
+### 注意事项与降级
+
+- 这套流程本质是**代替你操作界面**（该应用没有任何接口）。DTS 若更新 App 改了控件，
+  流程会失败并**只记日志**，不影响默认输出设备切换；此时可自行改 `dts_*` 配置或
+  把 `dts_enabled` 设为 `false` 恢复成"手动开一次 App"。
+- 需要新拉起 App 时，它的窗口可能极短暂地闪一下（程序在 ~100ms 内把它移到屏幕外）；
+  App 已在运行时不会有任何窗口出现。
+- 若某次始终没能确认授权：程序会**保留** App 在后台运行（窗口仍在屏幕外）并记 `warn`，
+  以便下次或你手动补救，而不是把它关掉。
+- 排查时把 `log_level` 改成 `debug`，日志里会打印 `DTS: ...` 各个环节。
+- 想让它常驻后台、避免每次重新启动：`"dts_close_after": false`。
+- 完整的实验方法、UI 控件 id 与原始记录见 `docs/experiments/FINDINGS.md`。
 
 ---
 
@@ -334,5 +386,8 @@ powershell -ExecutionPolicy Bypass -File scripts\install-autostart.ps1 -StartNow
 
 1. **不要拷贝旧机器的 `state.json`**：音频端点 GUID 在新机器上会不同，
    程序按 `config.json` 里的 `audio_keyword`（设备名关键词）在运行时查找设备，因此不需要 GUID。
-2. **DTS 空间音效要在新机器上重设一次**：该设置按音频端点保存在注册表里，不跟着程序走 ——
-   设置 → 系统 → 声音 → 耳机 → 空间音效 → **DTS Headphone:X**（设置一次即长期有效）。
+2. **DTS 空间音效**：本程序会在切换到耳机时自动启动 DTS Sound Unbound 完成授权
+   （详见上文"DTS 空间音效"专节）。新机器上需要先**装好 DTS Sound Unbound**（微软商店，
+   或用你耳机/主板厂商提供的版本）；如果新机器上的 AUMID 不同（可用
+   `Get-StartApps | Where-Object Name -match DTS` 查看），把 `config.json` 里的
+   `dts_aumid` 改成新值即可；不需要本功能就设 `dts_enabled: false`。

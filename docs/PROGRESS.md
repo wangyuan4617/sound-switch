@@ -345,3 +345,62 @@
   Windows 路径必须写成正斜杠 `C:/Users/...`；另外用 PowerShell 传含引号的 filter 字符串也会被剥离。
 - **残余风险提示**：GitHub 在强制推送后，旧提交对象可能在一段时间内仍可通过 SHA 直接访问。
   如需 100% 确定，最稳妥是删除远端仓库后重新创建再推送（仓库刚建、无 fork/star）。
+
+## 2026-09-29 23:30 — 第 22 步：DTS Headphone:X 自动启用（推翻第 13/15 步结论并实现）
+
+- **用户反馈（关键）**："仅修改注册表并不能真的生效，还是需要我手动启动 DTS Sound Unbound 软件"
+  → 第 13/15 步"只需设置一次、无需代码"的结论被推翻。
+
+### 22.1 重新实验（证据见 `docs/experiments/FINDINGS.md` 第七节）
+
+- **对照实验**：App 运行中 vs 杀掉 App，耳机端点三个空间音效属性（`{908dba32-…}` /
+  `{8a845654-…}` / `{fd8a7b27-…}`）**完全一致** → 授权是运行期行为，注册表里没有开关值，
+  "写注册表启用"这条路不存在。
+- **听感确认（用户）**：App 在后台、窗口被移到屏幕外、未点任何按钮 → **音效正常**；
+  之后**完全关闭 App** → **音效仍然正常**（本会话内）→ "启动 → 授权 → 关掉"三步可行。
+- **UI Automation 实测**（新增工具 `dump-dts-uia.ps1`、`dts-enable-prototype.ps1`）：
+  UWP 应用界面完全可程序化驱动。关键控件：授权卡 `DTSXHPNewLicenseTile`（读「已授权/未授权」）、
+  「更多选项」`Dotsx3Button`、「更新许可证」`RefreshLicensesButton`（= 用户手点的那一下）。
+  实测授权卡在启动后约 3~20 秒自动由「未授权」变「已授权」（点卡片只是导航到"耳机 X"页）。
+- **窗口/关闭行为**（`trace-dts-windows.ps1`、`probe-dts-windows.ps1`）：
+  可见窗口是 `ApplicationFrameWindow`（属于 ApplicationFrameHost.exe），标题固定；
+  **本机版本没有 `Windows.UI.Core.CoreWindow` 子窗口**，所以按标题匹配才可靠；
+  窗口从启动第 1 秒就可见（需尽快移出屏幕）；**关闭窗口 = 转入后台**（进程常驻），
+  要真正退出必须结束进程。
+- **调研（联网）**：DTS/ASUS 官方只说 "install and run the application"；中/德/英文社区
+  报告一致（每次开机/待机/重启都要手动开一次 App），**没有任何"不用 App"的替代路径**，
+  `SoundVolumeView /SetSpatial` 与直接写端点属性写的是同一层"设置"值，不能替代。
+
+### 22.2 实现（`src/dts.rs`，对应需求：切到耳机时启用、切走时不动）
+
+- 流程：切换到耳机后 → 按 AUMID（`IApplicationActivationManager::ActivateApplication`）启动
+  DTS Sound Unbound → 立刻把窗口移到屏幕外（`x=-32000`，保持 visible 以免被挂起）→
+  UI Automation 读授权卡 → 仍是"未授权/状态不明"则触发「更多选项 → 更新许可证」（最多 3 次）→
+  确认「已授权」后**关闭 App**（窗口关闭 + 结束进程；日志显示它默认"关窗转后台"）。
+- 未确认成功时**保留** App 在后台（窗口仍在屏幕外）并记 `warn`，不把补救入口关掉。
+- 在独立线程执行（`spawn_arm`，带 `AtomicBool` 防重入），不阻塞 HID 事件循环；
+  `dry_run` 下直接跳过。
+- 新增配置项：`dts_enabled` / `dts_aumid` / `dts_window_title` / `dts_licensed_text` /
+  `dts_arm_timeout_ms` / `dts_close_after`；新增 CLI 子命令 `dts-arm`（手动验证）。
+- Cargo.toml 新增 windows crate 特性：`Win32_UI_Shell`、`Win32_UI_Accessibility`、
+  `Win32_UI_WindowsAndMessaging`。
+
+### 22.3 实测（本机真机）
+
+```
+23:23:11.162 [INFO] DTS: 启动 DTS Sound Unbound（DTSInc.DTSSoundUnbound_t5j2fzbtdg37r!App）
+23:23:11.520 [INFO] DTS: 授权状态『DTS 耳机 X 未授权』
+23:23:14.563 [INFO] DTS: 授权状态『DTS 耳机 X 已授权』
+23:23:14.563 [INFO] DTS: 已授权（DTS Headphone:X 生效）
+23:23:18.564 [INFO] DTS: 关闭 DTS Sound Unbound      → 进程完全退出
+```
+
+- 期间修正的两个实现问题：① 先按"子窗口 PID"找框架窗口在本机失效 → 改为**标题优先**；
+  ② 启动后立刻发 `WM_CLOSE` 会被忽略（闪屏阶段）→ 授权确认后再等 4 秒才关闭，
+  并重试一次、最后才结束进程。
+
+### 22.4 仍未证实（如实记录）
+
+- 授权偶发失败（用户所述"没有规律"）的根因未定位，本次未抓到可复现的失败样本；
+- 强制结束进程对音效是否有副作用，只有用户听感确认，无客观测量手段；
+- App 升级后控件 id 可能变化 → 需更新常量/配置。
