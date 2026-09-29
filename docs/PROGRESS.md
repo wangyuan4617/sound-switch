@@ -404,3 +404,22 @@
 - 授权偶发失败（用户所述"没有规律"）的根因未定位，本次未抓到可复现的失败样本；
 - 强制结束进程对音效是否有副作用，只有用户听感确认，无客观测量手段；
 - App 升级后控件 id 可能变化 → 需更新常量/配置。
+
+## 2026-09-29 23:35 — 第 23 步：DTS 自动化交付（部署 + 提交 + 推送）
+
+- **部署**：新版 exe 与含 `dts_*` 的 `config.json` 已装到用户安装目录，后台实例与计划任务已用新版运行
+  （`LastTaskResult=0`、进程无窗口）；旧 exe 与旧 config 备份在安装目录的 `backup-before-dts\`。
+- **真机验证（用户）**：开关一次耳机 → 日志显示 2.2 秒完成「未授权 → 已授权」→ 关闭 App；
+  用户确认**音效生效且完全没有看到窗口闪现**。
+- **便携包**已重新生成（`dist\sound-switch-portable\`，含新版 exe、含 `dts_*` 的 config、更新后的使用说明）。
+- **代码整理**（提交前自查发现并修掉的两个问题）：
+  - `set-default` 等一次性命令会在 DTS 线程跑完前退出 → 改为 `spawn_arm` 返回句柄、`Actions::wait_dts_arm()` 等待；
+  - `dts-arm --dry-run` 仍会真的启动 App（dry-run 判断只在 `spawn_arm` 里）→ 把判断移入 `arm()` 本身。
+- **提交与推送**（仓库 `github.com/wangyuan4617/sound-switch`，分支 `main`）：
+  - `3479715` feat(dts): 切换到耳机时自动启用 DTS Headphone:X
+    （`src/dts.rs` + `app.rs`/`config.rs`/`main.rs`/`Cargo.toml`/`config.json`）；
+  - `da3bc67` docs(dts): 修正「设置一次即可」的结论，补充实验工具与说明
+    （FINDINGS 第七节、README 专节、DEPLOY/使用说明/make-package、4 个实验脚本）。
+- **提交前隐私核查**：扫描本机路径、用户名、音频端点 GUID 与 USB 实例路径 → 仅命中仓库地址本身；
+  含桌面的那份 UI 快照（`dts-uia-3-menu.txt`，含浏览器窗口标题）已删除；
+  `logs/`、`state.json`、`dist/`、`docs/experiments/dts-*.txt` 均被 `.gitignore` 排除，未入库。
