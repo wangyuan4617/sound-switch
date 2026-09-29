@@ -20,6 +20,8 @@ pub struct Actions {
     pub state_path: PathBuf,
     pub state: State,
     last_power: Option<(HidEvent, Instant)>,
+    /// 正在执行的 DTS 启用线程（`run` 模式下可丢弃；命令行一次性调用需要 join）
+    dts_arm: Option<std::thread::JoinHandle<()>>,
 }
 
 impl Actions {
@@ -31,6 +33,14 @@ impl Actions {
             state_path,
             state,
             last_power: None,
+            dts_arm: None,
+        }
+    }
+
+    /// 等待 DTS 启用流程结束（仅供 `set-default` 等短命命令行入口使用）
+    pub fn wait_dts_arm(&mut self) {
+        if let Some(h) = self.dts_arm.take() {
+            let _ = h.join();
         }
     }
 
@@ -153,6 +163,15 @@ impl Actions {
             self.save();
         } else {
             log::info("没有发生实际切换（可能已全部是耳机）");
+        }
+
+        // 切换到耳机后，确保 DTS Headphone:X 空间音效已生效：
+        // 启动 DTS Sound Unbound（窗口移到屏幕外）→ 等它完成授权 → 必要时替用户点
+        // 「更新许可证」→ 成功后关闭应用。详见 src/dts.rs。
+        // 切换到"非耳机"（关机/恢复）时不做任何操作。
+        if self.config.dts_enabled && !self.config.dts_aumid.is_empty() {
+            log::info("DTS: 开始确保 DTS Headphone:X 已启用…");
+            self.dts_arm = crate::dts::spawn_arm(self.config.clone());
         }
     }
 

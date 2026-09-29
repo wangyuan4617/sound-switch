@@ -19,6 +19,7 @@ use anyhow::Result;
 mod app;
 mod audio;
 mod config;
+mod dts;
 mod hid;
 mod log;
 mod single_instance;
@@ -36,6 +37,7 @@ fn usage() {
   sound-switch status             # 显示当前默认输出、目标端点、state 概览
   sound-switch set-default        # 手动执行“切到耳机”（测试用）
   sound-switch restore            # 手动执行“恢复原默认”（测试用）
+  sound-switch dts-arm            # 手动执行“确保 DTS 音效已启用”（测试用）
 
 通用参数:
   --config <path>                 配置文件路径，默认 ./config.json（首次运行自动生成）
@@ -178,10 +180,23 @@ fn main() -> Result<()> {
         "set-default" => {
             let mut actions = app::Actions::new(cfg);
             actions.manual_set_headset_default();
+            // 命令行进程会立刻退出，必须等 DTS 启用线程跑完（run 模式则不需要）
+            actions.wait_dts_arm();
         }
         "restore" => {
             let mut actions = app::Actions::new(cfg);
             actions.manual_restore();
+        }
+        "dts-arm" => {
+            // 手动验证「启动 DTS Sound Unbound → 完成授权 → 关闭」流程
+            if !cfg.dts_enabled || cfg.dts_aumid.is_empty() {
+                println!("config.json 里 dts_enabled=false 或 dts_aumid 为空，本功能已关闭");
+            } else {
+                match dts::arm(&cfg) {
+                    Ok(()) => println!("DTS 启用流程结束（详见日志）"),
+                    Err(e) => println!("DTS 启用流程失败: {e}"),
+                }
+            }
         }
         "run" | _ => {
             // 单实例保护：开机自启的实例与手动启动的实例不会同时监听

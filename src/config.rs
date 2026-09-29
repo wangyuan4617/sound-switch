@@ -32,6 +32,20 @@ pub struct Config {
     pub log_level: String,
     /// 单个日志文件大小上限（KB），超过则轮转为 sound_switch.log.1
     pub log_max_kb: u64,
+
+    // ---------------- DTS Headphone:X 空间音效（见 src/dts.rs 与 README） ----------------
+    /// 是否在「切换到耳机」时自动确保 DTS 音效已启用（启动 DTS Sound Unbound 并完成授权）
+    pub dts_enabled: bool,
+    /// DTS Sound Unbound 的 AUMID（应用用户模型 ID）。留空则本功能不做事
+    pub dts_aumid: String,
+    /// 用于兜底识别应用窗口的标题（正常情况下按进程 id 识别，用不到它）
+    pub dts_window_title: String,
+    /// 授权卡上表示"已授权/已生效"的文字（界面语言变化时可改）
+    pub dts_licensed_text: String,
+    /// 等待授权完成的时限（毫秒）。应用首次自检可能要几十秒
+    pub dts_arm_timeout_ms: u64,
+    /// 确认授权完成后是否关闭 DTS Sound Unbound（实测关闭后音效仍保留）
+    pub dts_close_after: bool,
 }
 
 impl Default for Config {
@@ -51,6 +65,12 @@ impl Default for Config {
             dry_run: false,
             log_level: "info".to_string(),
             log_max_kb: 512,
+            dts_enabled: true,
+            dts_aumid: "DTSInc.DTSSoundUnbound_t5j2fzbtdg37r!App".to_string(),
+            dts_window_title: "DTS Sound Unbound".to_string(),
+            dts_licensed_text: "已授权".to_string(),
+            dts_arm_timeout_ms: 90_000,
+            dts_close_after: true,
         }
     }
 }

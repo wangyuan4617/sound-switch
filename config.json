@@ -12,5 +12,11 @@
   "endpoint_wait_ms": 15000,
   "dry_run": false,
   "log_level": "info",
-  "log_max_kb": 512
+  "log_max_kb": 512,
+  "dts_enabled": true,
+  "dts_aumid": "DTSInc.DTSSoundUnbound_t5j2fzbtdg37r!App",
+  "dts_window_title": "DTS Sound Unbound",
+  "dts_licensed_text": "已授权",
+  "dts_arm_timeout_ms": 90000,
+  "dts_close_after": true
 }
