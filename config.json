@@ -18,5 +18,8 @@
   "dts_window_title": "DTS Sound Unbound",
   "dts_licensed_text": "已授权",
   "dts_arm_timeout_ms": 90000,
-  "dts_close_after": true
+  "dts_close_after": true,
+  "dts_fix_spatial": true,
+  "dts_spatial_timeout_ms": 120000,
+  "dts_allow_mouse_click": true
 }

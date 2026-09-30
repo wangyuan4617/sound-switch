@@ -46,6 +46,14 @@ pub struct Config {
     pub dts_arm_timeout_ms: u64,
     /// 确认授权完成后是否关闭 DTS Sound Unbound（实测关闭后音效仍保留）
     pub dts_close_after: bool,
+    /// 是否检查/修复 Windows 侧的空间音效选择 —— 系统会把它重置回"关闭/Sonic"，
+    /// 这正是"有时候必须手动点一下"的根因
+    pub dts_fix_spatial: bool,
+    /// 等待空间音效切换成功的时限（毫秒）
+    pub dts_spatial_timeout_ms: u64,
+    /// 是否允许"真实鼠标点击"兜底：App 里那个『启用 数字影院系统耳机：X』是 Text 元素，
+    /// 任何 UI Automation pattern 都点不动；该兜底需要把窗口临时显示到屏幕上
+    pub dts_allow_mouse_click: bool,
 }
 
 impl Default for Config {
@@ -71,6 +79,9 @@ impl Default for Config {
             dts_licensed_text: "已授权".to_string(),
             dts_arm_timeout_ms: 90_000,
             dts_close_after: true,
+            dts_fix_spatial: true,
+            dts_spatial_timeout_ms: 120_000,
+            dts_allow_mouse_click: true,
         }
     }
 }

@@ -158,20 +158,23 @@ impl Actions {
             }
         }
         if any_switch {
-            self.state.headset_endpoint_id = Some(target.id);
+            self.state.headset_endpoint_id = Some(target.id.clone());
             self.state.headset_active = true;
             self.save();
         } else {
             log::info("没有发生实际切换（可能已全部是耳机）");
         }
 
-        // 切换到耳机后，确保 DTS Headphone:X 空间音效已生效：
-        // 启动 DTS Sound Unbound（窗口移到屏幕外）→ 等它完成授权 → 必要时替用户点
-        // 「更新许可证」→ 成功后关闭应用。详见 src/dts.rs。
+        // 切换到耳机后，确保 DTS Headphone:X 空间音效已生效（两件事都要成立）：
+        //   ① Windows 侧：耳机端点的「空间音效」必须选中 DTS Headphone:X（系统会重置它）
+        //   ② 应用侧：DTS Sound Unbound 完成授权
+        // 做法：启动应用（窗口移到屏幕外）→ 等授权 → 用端点属性检查空间音效，
+        // 若不是 DTS 就在应用里点击『启用』→ 确认后关闭应用。详见 src/dts.rs。
         // 切换到"非耳机"（关机/恢复）时不做任何操作。
         if self.config.dts_enabled && !self.config.dts_aumid.is_empty() {
             log::info("DTS: 开始确保 DTS Headphone:X 已启用…");
-            self.dts_arm = crate::dts::spawn_arm(self.config.clone());
+            self.dts_arm =
+                crate::dts::spawn_arm(self.config.clone(), Some(target.id.clone()));
         }
     }
 

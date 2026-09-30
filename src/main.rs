@@ -188,11 +188,26 @@ fn main() -> Result<()> {
             actions.manual_restore();
         }
         "dts-arm" => {
-            // 手动验证「启动 DTS Sound Unbound → 完成授权 → 关闭」流程
+            // 手动验证「启动 DTS Sound Unbound → 完成授权 → 确保空间音效 = DTS → 关闭」流程
             if !cfg.dts_enabled || cfg.dts_aumid.is_empty() {
                 println!("config.json 里 dts_enabled=false 或 dts_aumid 为空，本功能已关闭");
             } else {
-                match dts::arm(&cfg) {
+                // 手动执行时自己去找耳机端点（按 audio_keyword）
+                let endpoint = match audio::find_endpoint_by_keyword(&cfg.audio_keyword) {
+                    Ok(Some(ep)) => {
+                        println!("耳机端点: {} ({})", ep.name, ep.id);
+                        Some(ep.id)
+                    }
+                    Ok(None) => {
+                        println!("未找到耳机端点（耳机可能未开机），只做应用侧授权");
+                        None
+                    }
+                    Err(e) => {
+                        println!("枚举音频端点失败: {e}");
+                        None
+                    }
+                };
+                match dts::arm(&cfg, endpoint.as_deref()) {
                     Ok(()) => println!("DTS 启用流程结束（详见日志）"),
                     Err(e) => println!("DTS 启用流程失败: {e}"),
                 }
